@@ -1,41 +1,76 @@
-﻿'use strict';
+'use strict';
 
 
 //webRTC取得準備
 let localStream = null;
 let peer = null;
 let existingCall = null;
+let deviceIDglobal = null;
 //let peerConnection = null;
+
 
 //audio処理用
 window.AudioContext = window.AudioContext || window.webkitAudioContext; 
+
+
+ // device ID知るとき用
+function getDeviceList(){
+navigator.mediaDevices.enumerateDevices()
+.then(function(devices) {
+  devices.forEach(function(device) {
+    console.log("deviceID : " + devices[1].deviceId);
+	deviceIDglobal = devices[1].deviceId;
+  });
+})
+.catch(function(err) {
+  console.log(err.name + ": " + err.message);
+});
+};
+
+function getMedia(){
+//var deviceID = devices[0].deviceId;
 navigator.mediaDevices.getUserMedia(
-    { video : false , audio : true })
+     {
+        video : false,
+        audio :{
+        deviceId:deviceIDglobal,
+        echoCancellation:false
+                 }
+    }
+)
 
 .then(function (stream){
+
+    console.log("getusermediaID : " + deviceIDglobal);
 
     //AudioContextを作成
     var context  = new AudioContext();
 
     //sourceの作成
     var source = context.createMediaStreamSource(stream);
+    var splitter = context.createChannelSplitter(2);
+    source.connect(splitter);
+    var merger = context.createChannelMerger(2); 
+    splitter.connect(merger,0,0);
+    splitter.connect(merger,1,1);
 
-    //panner の作成
-    var panner = context.createStereoPanner();
-    source.connect(panner);
-    panner.pan.value = 0;
-
-    //peer1の作成
+       //peer1の作成
     var peer1 = context.createMediaStreamDestination();
 
-    panner.connect(peer1); //ココの先頭変えるよ
+    merger.connect(peer1); //ココの先頭変えるよ
     localStream = peer1.stream;
 
 }).catch(function (error) {
     // Error
     console.error('mediaDevice.getUserMedia() error:', error);
     return;
- });
+});
+};
+
+getDeviceList();
+getMedia();
+
+
 
 ///////////Peerオブジェクトの作成
 peer = new Peer({
@@ -67,7 +102,7 @@ $('#make-call').submit(function(e){
     e.preventDefault();
     const call = peer.call($('#callto-id').val(), localStream); 
     setupCallEventHandlers(call);
-});
+    });
 
 $('#end-call').click(function(){
     existingCall.close();
@@ -108,6 +143,7 @@ function addVideo(call,stream){
 
 function removeVideo(peerId){
     $('#'+peerId).remove();
+    alert("つながったようです。");
 }
 
 function setupMakeCallUI(){
